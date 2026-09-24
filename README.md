@@ -8,8 +8,9 @@ Jopara is the mix of Spanish and Guaraní that most Paraguayans speak every day.
 releases:
 
 - **The benchmark definition.** Per-utterance labels and train/dev/test assignments for 2,340
-  utterances (3.81 hours) of spontaneous Jopara from the CEGPA corpus, checked against the audio by
-  three native speakers. The utterances cover monolingual speech, sentence-level switching, and
+  utterances (3.81 hours) of spontaneous Jopara from the CEGPA corpus, verified against the audio in
+  a six-month, 100+ person-hour collaboration with three native Paraguayan speakers of Indigenous
+  origin. The utterances cover monolingual speech, sentence-level switching, and
   *jehe'a*, where one word fuses a Spanish root with Guaraní morphology.
 - **The curation pipeline.** Audio preparation, the spelling-normalization bank, and word-level
   language tagging.
@@ -25,12 +26,15 @@ Character error rate / word error rate (%) on the 150-utterance test set (full t
 | System | CER / WER |
 |---|---|
 | OmniASR, auto-detect language (baseline) | 28.4 / 50.4 |
-| OmniASR, told to expect Guaraní (`grn_Latn`) | **25.0 / 47.9** |
+| OmniASR, told to expect Guaraní (`grn_Latn`) | 25.0 / 47.9 |
 | Best LoRA adapter applied to everything | 29.1 / 53.8 |
-| Mixture of experts, code-switching slot empty (3 seeds) | 24.3±0.1 / 46.1±0.2 |
+| Mixture of experts, code-switching slot empty (3 seeds) | **24.3±0.1 / 46.1±0.2** |
 
-Naming the language is the most effective fix. Adapters and routing add no significant gain on
-top of the Guaraní language mode.
+Without a specified language, current multilingual ASR still makes 28.4% character errors.
+Telling it which language to expect is the most effective fix (25.0% CER), and our best system, a
+mixture-of-experts router over fine-tuned adapters, reaches 24.3% CER. Under this data scarcity,
+however, a dedicated code-switching adapter shows no measurable benefit, and routing does not
+significantly beat naming the language.
 
 ## What is and is not in this repository
 
