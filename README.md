@@ -1,7 +1,7 @@
 # Jopara ASR: benchmark and baselines for spontaneous Spanish–Guaraní code-switching
 
 Code and benchmark metadata for the paper *Jopara ASR: A Community-Verified Benchmark and
-Baselines for Spontaneous Spanish–Guaraní Code-Switching* (Wenchen Shi, Shuju Shi; submitted
+Baselines for Spontaneous Spanish–Guaraní Code-Switching* (Wenchen Shi (wencshi@iu.edu), Shuju Shi (sh16@iu.edu); submitted
 to ICASSP 2027).
 
 Jopara is the mix of Spanish and Guaraní that most Paraguayans speak every day. This repository
