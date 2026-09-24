@@ -1,0 +1,17 @@
+# Training, OmniASR inference and scoring (Python 3.10; versions from the environment we ran in)
+torch==2.8.0
+torchaudio==2.8.0
+fairseq2==0.6
+# omnilingual-asr 0.2.0: install from source with our patch, see third_party/README.md
+numpy==2.2.6
+pandas==2.3.3
+PyYAML==6.0.3
+scipy==1.15.3
+tqdm==4.67.1
+# Scoring also needs SCTK's `sclite` on PATH (e.g. `conda install -c conda-forge sctk`).
+
+# These ran in separate environments; install as needed:
+#   openai-whisper   evaluation/inference/run_whisper_inference.py (row 1)
+#   transformers     evaluation/inference/run_mms_inference.py (row 2)
+#   openai           curation/spl_correction, curation/lid_tagging (ReaLLMs, OpenAI-compatible API)
+#   pydub, soundfile curation/preprocessing (needs ffmpeg)

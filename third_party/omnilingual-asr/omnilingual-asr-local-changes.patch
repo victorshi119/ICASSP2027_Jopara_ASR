@@ -1,0 +1,458 @@
+diff --git a/src/omnilingual_asr/cards/models/rc_models_v2.yaml b/src/omnilingual_asr/cards/models/rc_models_v2.yaml
+index 1835198..251d49b 100644
+--- a/src/omnilingual_asr/cards/models/rc_models_v2.yaml
++++ b/src/omnilingual_asr/cards/models/rc_models_v2.yaml
+@@ -102,3 +102,19 @@ model_family: wav2vec2_llama
+ model_arch: 7b_unlimited_v2
+ checkpoint: https://dl.fbaipublicfiles.com/mms/omniASR-LLM-Unlimited-7B-v2.pt
+ tokenizer_ref: omniASR_tokenizer_written_v2
++
++---
++
++name: omniASR_LLM_300M_v2_hdmole_debug
++model_family: wav2vec2_llama
++model_arch: 300m_v2_hdmole_debug
++checkpoint: https://dl.fbaipublicfiles.com/mms/omniASR-LLM-300M-v2.pt
++tokenizer_ref: omniASR_tokenizer_written_v2
++
++---
++
++name: omniASR_LLM_7B_v2_hdmole_debug
++model_family: wav2vec2_llama
++model_arch: 7b_v2_hdmole_debug
++checkpoint: https://dl.fbaipublicfiles.com/mms/omniASR-LLM-7B-v2.pt
++tokenizer_ref: omniASR_tokenizer_written_v2
+diff --git a/src/omnilingual_asr/datasets/storage/manifest_storage.py b/src/omnilingual_asr/datasets/storage/manifest_storage.py
+index 3acf035..12f8f29 100644
+--- a/src/omnilingual_asr/datasets/storage/manifest_storage.py
++++ b/src/omnilingual_asr/datasets/storage/manifest_storage.py
+@@ -134,6 +134,10 @@ class ManifestStorage(StorageInterface[ManifestStorageConfig]):
+         train-clean-100/1553/140047/1553-140047-0001.flac       219840
+         (...)
+         ```
++        Optional third column can include language codes, e.g.:
++        ```
++        train-clean-100/1553/140047/1553-140047-0000.flac       180080    eng_Latn
++        ```
+         """
+         tsv_file = manifest_dir.joinpath(f"{split}.tsv")
+ 
+@@ -141,7 +145,23 @@ class ManifestStorage(StorageInterface[ManifestStorageConfig]):
+ 
+         builder.skip(1)  # Path to the data directory.
+ 
+-        field_splitter = StrSplitter(names=["audio", "length"])
++        num_fields = 2
++        with tsv_file.open(encoding="utf-8") as fp:
++            fp.readline()
++            for line in fp:
++                line = line.rstrip()
++                if line:
++                    num_fields = len(line.split("\t"))
++                    break
++
++        if num_fields <= 2:
++            names = ["audio", "length"]
++        else:
++            names = ["audio", "length", "lang"] + [
++                f"extra_{i}" for i in range(3, num_fields)
++            ]
++
++        field_splitter = StrSplitter(names=names)
+ 
+         builder.map(field_splitter)
+ 
+diff --git a/src/omnilingual_asr/models/inference/pipeline.py b/src/omnilingual_asr/models/inference/pipeline.py
+index e0ba01c..28c07ae 100644
+--- a/src/omnilingual_asr/models/inference/pipeline.py
++++ b/src/omnilingual_asr/models/inference/pipeline.py
+@@ -58,7 +58,7 @@ AudioInput = (
+     | List[Dict[str, Any]]
+ )
+ 
+-MAX_ALLOWED_AUDIO_SEC: Final = 40
++MAX_ALLOWED_AUDIO_SEC: Final = 90
+ 
+ 
+ @dataclass
+diff --git a/src/omnilingual_asr/models/wav2vec2_llama/config.py b/src/omnilingual_asr/models/wav2vec2_llama/config.py
+index b096547..5dfb277 100644
+--- a/src/omnilingual_asr/models/wav2vec2_llama/config.py
++++ b/src/omnilingual_asr/models/wav2vec2_llama/config.py
+@@ -15,6 +15,7 @@ from fairseq2.models.wav2vec2.asr import Wav2Vec2AsrConfig
+ from fairseq2.runtime.config_registry import ConfigRegistrar, get_config
+ from fairseq2.runtime.dependency import DependencyContainer, DependencyResolver
+ 
++from omnilingual_asr.models.wav2vec2_llama.hdmole import HdmoleConfig
+ WAV2VEC2_LLAMA_FAMILY: Final = "wav2vec2_llama"
+ 
+ 
+@@ -126,6 +127,9 @@ class Wav2Vec2LlamaConfig:
+     )
+     """Streaming configuration for >30s transcriptions."""
+ 
++    hdmole: HdmoleConfig = field(default_factory=lambda: HdmoleConfig())
++    """Optional HDMoLE configuration for adapter routing."""
++
+     encoder_stacking: int = 1
+     """The number audio embeddings frames to stack before the decoder calls."""
+ 
+@@ -357,7 +361,23 @@ def register_wav2vec2_llama_configs(container: DependencyContainer) -> None:
+         resolver: DependencyResolver,
+     ) -> Wav2Vec2LlamaConfig:
+         config = _7b_llama_v2(resolver)
+-        config.wav2vec2_asr_config = get_config(resolver, Wav2Vec2AsrConfig, "300m")
++        config.wav2vec2_asr_config = get_config(resolver, Wav2Vec2AsrConfig, "300m_v2")
++        return config
++
++    @arch("300m_v2_hdmole_debug", advanced=True)
++    def _300m_llama_v2_hdmole_debug(
++        resolver: DependencyResolver,
++    ) -> Wav2Vec2LlamaConfig:
++        config = _300m_llama_v2(resolver)
++        config.hdmole.enabled = True
++        return config
++
++    @arch("7b_v2_hdmole_debug", advanced=True)
++    def _7b_llama_v2_hdmole_debug(
++        resolver: DependencyResolver,
++    ) -> Wav2Vec2LlamaConfig:
++        config = _7b_llama_v2(resolver)
++        config.hdmole.enabled = True
+         return config
+ 
+     # Base streaming model flavors
+diff --git a/src/omnilingual_asr/models/wav2vec2_llama/factory.py b/src/omnilingual_asr/models/wav2vec2_llama/factory.py
+index aa6a660..c56aa10 100644
+--- a/src/omnilingual_asr/models/wav2vec2_llama/factory.py
++++ b/src/omnilingual_asr/models/wav2vec2_llama/factory.py
+@@ -36,6 +36,7 @@ from fairseq2.models.wav2vec2.asr.factory import _init_final_projection
+ from fairseq2.nn import Linear, PositionEncoder, StandardEmbedding
+ 
+ from omnilingual_asr.models.wav2vec2_llama.config import Wav2Vec2LlamaConfig
++from omnilingual_asr.models.wav2vec2_llama.hdmole import HdmoleModule
+ from omnilingual_asr.models.wav2vec2_llama.model import Wav2Vec2LlamaModel
+ 
+ log = get_log_writer(__name__)
+@@ -256,6 +257,14 @@ class Wav2Vec2LlamaFactory:
+                 self._config.streaming_config.text_tokenizer
+             ).create_encoder()
+ 
++        hdmole = None
++        if self._config.hdmole.enabled:
++            hdmole = HdmoleModule(
++                self._config.llama_config.model_dim,
++                config=self._config.hdmole,
++                language_column_name=self._config.language_column_name,
++            )
++
+         # constructing target vocabulary info with wav2vec2 size
+         target_vocab_info = VocabularyInfo(
+             size=self._config.wav2vec2_asr_config.target_vocab_size,
+@@ -288,4 +297,5 @@ class Wav2Vec2LlamaFactory:
+             n_context_examples=self._config.n_context_examples,
+             streaming_config=self._config.streaming_config,
+             text_encoder=text_encoder,
++            hdmole=hdmole,
+         )
+diff --git a/src/omnilingual_asr/models/wav2vec2_llama/model.py b/src/omnilingual_asr/models/wav2vec2_llama/model.py
+index 489b1a9..c37313b 100644
+--- a/src/omnilingual_asr/models/wav2vec2_llama/model.py
++++ b/src/omnilingual_asr/models/wav2vec2_llama/model.py
+@@ -69,6 +69,7 @@ class Wav2Vec2LlamaModel(AsrModel):
+         text_encoder: TokenEncoder | None = None,
+         n_context_examples: int = 0,
+         seed: int = 42,
++        hdmole: nn.Module | None = None,
+     ) -> None:
+         """
+         :param model_type:
+@@ -131,6 +132,7 @@ class Wav2Vec2LlamaModel(AsrModel):
+         self.streaming_config = streaming_config
+         self.text_encoder = text_encoder
+         self.special_tokens = Wav2Vec2LlamaSpecialTokens(self.target_vocab_info.size)
++        self.hdmole = hdmole
+ 
+         self.register_module("masker", masker)
+ 
+@@ -218,6 +220,8 @@ class Wav2Vec2LlamaModel(AsrModel):
+ 
+         # Run the decoder
+         dec_out = self.llama_decoder(decoder_inputs, decoder_inputs_layout)
++        if self.hdmole is not None:
++            dec_out = self.hdmole(dec_out, batch)
+         logits_ = self.final_proj(dec_out)
+ 
+         # BC SDPA workaround
+diff --git a/workflows/recipes/wav2vec2/asr/default_config.py b/workflows/recipes/wav2vec2/asr/default_config.py
+index 6db84a6..37749a3 100644
+--- a/workflows/recipes/wav2vec2/asr/default_config.py
++++ b/workflows/recipes/wav2vec2/asr/default_config.py
+@@ -90,6 +90,9 @@ class Wav2Vec2AsrTrainerSection(TrainerSection):
+     freeze_encoder_for_n_steps: int = 10_000
+     """The encoder will be frozen for this number of steps."""
+ 
++    trainable_param_patterns: list[str] = field(default_factory=list)
++    """Regex patterns for parameters to remain trainable (others are frozen)."""
++
+ 
+ @dataclass(kw_only=True)
+ class Wav2Vec2AsrRecipeConfig:
+diff --git a/workflows/recipes/wav2vec2/asr/recipe.py b/workflows/recipes/wav2vec2/asr/recipe.py
+index f6369b8..5bf8a7f 100644
+--- a/workflows/recipes/wav2vec2/asr/recipe.py
++++ b/workflows/recipes/wav2vec2/asr/recipe.py
+@@ -7,6 +7,7 @@
+ from __future__ import annotations
+ 
+ from collections.abc import MutableMapping
++import re
+ from typing import cast, final
+ 
+ from fairseq2.composition import register_dataset_family
+@@ -124,8 +125,26 @@ class Wav2Vec2AsrRecipe(TrainRecipe):
+         # Always freeze feature extractor
+         freeze_parameters(asr_module.encoder_frontend.feature_extractor)
+ 
++        if config.trainer.trainable_param_patterns:
++            self._apply_trainable_param_patterns(
++                asr_module, config.trainer.trainable_param_patterns
++            )
++            # Keep feature extractor frozen even if patterns are broad.
++            freeze_parameters(asr_module.encoder_frontend.feature_extractor)
++
+         return model
+ 
++    @staticmethod
++    def _apply_trainable_param_patterns(model: Wav2Vec2AsrModel, patterns: list[str]) -> None:
++        freeze_parameters(model)
++        matched = 0
++        for name, param in model.named_parameters():
++            if any(re.search(pat, name) for pat in patterns):
++                param.requires_grad = True
++                matched += 1
++        if matched == 0:
++            log.warning("No parameters matched trainable_param_patterns.")
++
+     @override
+     def create_trainer(self, context: RecipeContext) -> Trainer:
+         """Main recipe entry point."""
+@@ -137,7 +156,9 @@ class Wav2Vec2AsrRecipe(TrainRecipe):
+         criterion = Wav2Vec2AsrCriterion(context.model)
+ 
+         unit = Wav2Vec2AsrTrainUnit(
+-            criterion, config.trainer.freeze_encoder_for_n_steps
++            criterion,
++            config.trainer.freeze_encoder_for_n_steps,
++            config.trainer.trainable_param_patterns,
+         )
+ 
+         if config.dataset.train_split is None:
+@@ -218,9 +239,13 @@ class Wav2Vec2AsrTrainUnit(TrainUnit[Seq2SeqBatch]):
+     _criterion: Wav2Vec2AsrCriterion
+     _freeze_encoder_for_n_steps: int
+     _frozen: bool
++    _trainable_param_patterns: list[str]
+ 
+     def __init__(
+-        self, criterion: Wav2Vec2AsrCriterion, freeze_encoder_for_n_steps: int
++        self,
++        criterion: Wav2Vec2AsrCriterion,
++        freeze_encoder_for_n_steps: int,
++        trainable_param_patterns: list[str],
+     ) -> None:
+         """
+         :param criterion: The ASR criterion holding the model.
+@@ -229,12 +254,15 @@ class Wav2Vec2AsrTrainUnit(TrainUnit[Seq2SeqBatch]):
+         self._criterion = criterion
+         self._freeze_encoder_for_n_steps = freeze_encoder_for_n_steps
+         self._frozen = False
++        self._trainable_param_patterns = trainable_param_patterns
+ 
+     @override
+     def set_step_nr(self, step_nr: int) -> None:
+         """Gradually unfreeze encoder during training for stability.
+         Freezes encoder/masker for first N steps, then unfreezes while keeping feature extractor frozen.
+         """
++        if self._trainable_param_patterns:
++            return
+         base_module = cast(Wav2Vec2AsrModel, self._criterion.model.base_module)
+ 
+         if step_nr <= self._freeze_encoder_for_n_steps:
+diff --git a/src/omnilingual_asr/models/wav2vec2_llama/hdmole.py b/src/omnilingual_asr/models/wav2vec2_llama/hdmole.py
+new file mode 100644
+index 0000000..be4aeee
+--- /dev/null
++++ b/src/omnilingual_asr/models/wav2vec2_llama/hdmole.py
+@@ -0,0 +1,171 @@
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++from typing import Iterable
++
++import torch
++import torch.nn as nn
++
++
++@dataclass(kw_only=True)
++class HdmoleConfig:
++    enabled: bool = False
++    expert_names: list[str] = field(
++        default_factory=lambda: ["spanish_only", "guarani_only", "mixed"]
++    )
++    active_expert: str = ""
++    init_experts_from: str = ""
++    lora_rank: int = 8
++    lora_alpha: float = 16.0
++    use_adapters: bool = True
++    use_router: bool = False
++    use_global_router: bool = True
++    router_dropout_p: float = 0.0
++    router_threshold_init: float = 0.2
++    ger_enabled: bool = False
++    # If set, global router uses this column for expert key (e.g. "extra_3");
++    # otherwise uses language_column_name. Lets manifest use lang=spa_Latn/grn_Latn
++    # for LID and a separate column for expert routing.
++    router_column_name: str = ""
++
++
++class LoRAAdapter(nn.Module):
++    def __init__(self, model_dim: int, rank: int, alpha: float) -> None:
++        super().__init__()
++        self.lora_down = nn.Linear(model_dim, rank, bias=False)
++        self.lora_up = nn.Linear(rank, model_dim, bias=False)
++        self.scaling = alpha / float(rank)
++
++    def forward(self, x: torch.Tensor) -> torch.Tensor:
++        return self.lora_up(self.lora_down(x)) * self.scaling
++
++
++class HdmoleModule(nn.Module):
++    def __init__(
++        self,
++        model_dim: int,
++        *,
++        config: HdmoleConfig,
++        language_column_name: str = "lang",
++    ) -> None:
++        super().__init__()
++        self.model_dim = model_dim
++        self.config = config
++        self.language_column_name = language_column_name
++        self._router_column = config.router_column_name or language_column_name
++
++        use_adapters_or_router = config.use_adapters or config.use_router
++        self.lora_adapters = nn.ModuleDict()
++        if use_adapters_or_router:
++            for name in config.expert_names:
++                self._ensure_adapter(name)
++            if config.active_expert:
++                self._ensure_adapter(config.active_expert)
++            if config.init_experts_from and config.init_experts_from not in self.lora_adapters:
++                self._ensure_adapter(config.init_experts_from)
++            self.router = nn.Linear(model_dim, len(self.lora_adapters), bias=True)
++            self.router_dropout = nn.Dropout(p=config.router_dropout_p)
++            self.router_thresholds = nn.Parameter(
++                torch.full((len(self.lora_adapters),), config.router_threshold_init)
++            )
++        else:
++            self.router = None
++            self.router_dropout = None
++            self.router_thresholds = None
++
++        self.ger_adapter = (
++            LoRAAdapter(model_dim, config.lora_rank, config.lora_alpha)
++            if config.ger_enabled
++            else None
++        )
++
++        self._experts_initialized = False
++
++    def _ensure_adapter(self, name: str) -> None:
++        if name not in self.lora_adapters:
++            self.lora_adapters[name] = LoRAAdapter(
++                self.model_dim, self.config.lora_rank, self.config.lora_alpha
++            )
++
++    def _maybe_init_experts(self) -> None:
++        if self._experts_initialized or not self.config.init_experts_from:
++            return
++        src = self.config.init_experts_from
++        if src not in self.lora_adapters:
++            return
++        for name, adapter in self.lora_adapters.items():
++            if name == src:
++                continue
++            adapter.load_state_dict(self.lora_adapters[src].state_dict())
++        self._experts_initialized = True
++
++    def _global_router_weights(
++        self, batch, device: torch.device, num_experts: int
++    ) -> torch.Tensor:
++        if not self.config.use_global_router:
++            return torch.full((batch.source_seqs.size(0), num_experts), 1.0 / num_experts).to(
++                device
++            )
++        if not isinstance(batch.example, dict):
++            return torch.full((batch.source_seqs.size(0), num_experts), 1.0 / num_experts).to(
++                device
++            )
++        langs = batch.example.get(self._router_column)
++        if not langs:
++            return torch.full((batch.source_seqs.size(0), num_experts), 1.0 / num_experts).to(
++                device
++            )
++        name_to_idx = {name: idx for idx, name in enumerate(self.lora_adapters.keys())}
++        weights = torch.zeros((len(langs), num_experts), device=device)
++        for i, lang in enumerate(langs):
++            key = str(lang)
++            if key in name_to_idx:
++                weights[i, name_to_idx[key]] = 1.0
++            else:
++                weights[i] = 1.0 / num_experts
++        return weights
++
++    def _collect_expert_deltas(
++        self, dec_out: torch.Tensor, names: Iterable[str]
++    ) -> list[torch.Tensor]:
++        return [self.lora_adapters[name](dec_out) for name in names]
++
++    def forward(self, dec_out: torch.Tensor, batch) -> torch.Tensor:
++        if not self.config.use_adapters:
++            return dec_out
++
++        self._maybe_init_experts()
++
++        if self.config.active_expert:
++            delta = self.lora_adapters[self.config.active_expert](dec_out)
++            if self.ger_adapter is not None:
++                delta = delta + self.ger_adapter(dec_out)
++            return dec_out + delta
++
++        if not self.config.use_router or len(self.lora_adapters) == 0:
++            return dec_out
++
++        device = dec_out.device
++        B, T, _ = dec_out.shape
++        num_experts = len(self.lora_adapters)
++        expert_names = list(self.lora_adapters.keys())
++
++        router_logits = self.router_dropout(self.router(dec_out))
++        local_weights = torch.softmax(router_logits, dim=-1)
++        global_weights = self._global_router_weights(batch, device, num_experts)
++        weights = local_weights * global_weights.view(B, 1, num_experts)
++
++        thresholds = torch.sigmoid(self.router_thresholds).view(1, 1, num_experts)
++        mask = weights >= thresholds
++        weights = weights * mask
++        weight_sums = weights.sum(dim=-1, keepdim=True).clamp_min(1e-6)
++        weights = weights / weight_sums
++
++        deltas = self._collect_expert_deltas(dec_out, expert_names)
++        stacked = torch.stack(deltas, dim=-1)
++        weighted_delta = (stacked * weights.unsqueeze(-2)).sum(dim=-1)
++
++        if self.ger_adapter is not None:
++            weighted_delta = weighted_delta + self.ger_adapter(dec_out)
++
++        return dec_out + weighted_delta

@@ -1,0 +1,40 @@
+# Multi-seed variant of results/June_24_Experiments/configs/a2_nullcs_router.yaml
+# (rebuttal #6, 2026-08-11). Only E_grn (B3) varies per seed; E_spa=B2_spa_d010 and
+# E_cs=null stay fixed at the production A2-NullCS values so the seed sweep isolates
+# router+B3 variance around the headline 24.0% overall CER claim.
+
+variant: a2_nullcs_seed42
+language_mode: grn_Latn
+description: "A2-NullCS multi-seed run (seed=42): E_cs=null, E_spa=B2_spa_d010 (fixed), E_grn=B3_grn_cv_cegpa_seed42. Router=router_seeds/seed_42/router_best.pt."
+
+model:
+  card: omniASR_LLM_7B_v2
+
+target_modules:
+  - q_proj
+  - v_proj
+
+lora_dropout: 0.0
+
+experts:
+  spa:
+    adapter_path: /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_spa_d010/lora_adapters.pt
+    lora_config:  /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_spa_d010/lora_config.json
+    note: "E_spa = B2_spa_d010 — fixed, same as production A2-NullCS."
+  cs:
+    adapter_path: /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/null_cs_z0/lora_adapters.pt
+    lora_config:  /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/null_cs_z0/lora_config.json
+    note: "E_cs = null adapter — fixed, same as production A2-NullCS."
+  grn:
+    adapter_path: /N/scratch/wencshi/icassp2026_lora/v3_lora_runs/lora_runs/B3_grn_cv_cegpa_seed42/lora_adapters.pt
+    lora_config:  /N/scratch/wencshi/icassp2026_lora/v3_lora_runs/lora_runs/B3_grn_cv_cegpa_seed42/lora_config.json
+    note: "E_grn = B3_grn_cv_cegpa retrained with seed=42 (rebuttal multi-seed variance)."
+
+router:
+  d_enc: 4096
+  hidden: 512
+  pooling: mean
+  dropout: 0.1
+
+device: cuda
+dtype: bfloat16

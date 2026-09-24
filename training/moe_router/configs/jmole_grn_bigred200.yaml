@@ -1,0 +1,31 @@
+# BigRed200-local copy of jopara_mole_asr/configs/jmole_grn.yaml's `training.a2` block.
+# The original config still has JetStream2 /media/volume/... paths (pre-migration artifact);
+# this rewrites embeddings/soft-target/checkpoint paths to their BigRed200 project-storage
+# equivalents so Stage A2 (router-only) training can be rerun here for multi-seed variance
+# (rebuttal reviewer #6, 2026-08-11). Only the `training.a2` section is used by
+# train_router_on_embeddings.py; router/pooling/hidden/dropout match the original.
+
+variant: jmole_grn_bigred200
+language_mode: grn_Latn
+description: "Stage A2 router-only retrain on BigRed200 for multi-seed variance (rebuttal #6)."
+
+router:
+  d_enc: 4096
+  hidden: 512
+  pooling: mean
+  dropout: 0.1
+
+training:
+  a2:
+    embeddings_train: /N/project/icassp2026/Jopara_ASR_models_js2/results/June_14_Multitask_Audio_LLM/embeddings/train_embeddings.npy
+    embeddings_dev:   /N/project/icassp2026/Jopara_ASR_models_js2/results/June_14_Multitask_Audio_LLM/embeddings/dev_embeddings.npy
+    soft_targets_train: /N/project/icassp2026/Jopara_ASR_models_js2/results/June_15_Multitask_Audio_LLM/jopara_mole_asr/data/soft_regime_targets_train.jsonl
+    soft_targets_dev:   /N/project/icassp2026/Jopara_ASR_models_js2/results/June_15_Multitask_Audio_LLM/jopara_mole_asr/data/soft_regime_targets_dev.jsonl
+    lr: 1.0e-3
+    batch_size: 128
+    max_epochs: 50
+    patience: 10
+    lambda_kl: 0.2
+    lambda_entropy: 0.001
+    # Overridden per-run via --checkpoint-dir; placeholder only.
+    checkpoint_dir: /N/scratch/wencshi/icassp2026_rebuttal/router_seeds/default

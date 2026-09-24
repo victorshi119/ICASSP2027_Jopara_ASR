@@ -1,0 +1,48 @@
+# Base recipe for LoRA 7B spa_Latn. train_lora.py overlays training/regime from A0–A4 config.
+model:
+  name: "omniASR_LLM_7B_v2"
+
+dataset:
+  name: "jopara_7b_regular_manifest"
+  train_split: "train_all"
+  valid_split: "dev"
+  storage_mode: "MANIFEST"
+  task_mode: "ASR"
+  manifest_storage_config:
+    read_text: true
+  asr_task_config:
+    min_audio_len: 1
+    max_audio_len: 320_000
+    max_num_elements: 320_000
+    batch_shuffle_window: 1
+    normalize_audio: true
+    example_shuffle_window: 1
+
+tokenizer:
+  name: "omniASR_tokenizer_written_v2"
+
+optimizer:
+  config:
+    lr: 1.0e-4
+    weight_decay: 0.01
+    betas: [0.9, 0.98]
+    eps: 1.0e-8
+
+trainer:
+  data_parallelism: "fsdp"
+  fsdp:
+    granularity: "stack"
+    version: "v1"
+    fp32_reduce: false
+  freeze_encoder_for_n_steps: 0
+  mixed_precision:
+    dtype: "torch.bfloat16"
+  grad_accumulation:
+    num_batches: 8
+
+regime:
+  num_steps: 4000
+  validate_after_n_steps: 0
+  validate_every_n_steps: 200
+  checkpoint_every_n_steps: 200
+  publish_metrics_every_n_steps: 50

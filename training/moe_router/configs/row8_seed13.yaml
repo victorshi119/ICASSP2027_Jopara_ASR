@@ -1,0 +1,40 @@
+# 2026-09-21: row 8 (full mixture-of-experts, real CS expert) multi-seed sweep, added for
+# symmetry with Table 1 row 9's mean+/-std over 3 seeds (reviewer-facing consistency: both
+# rows now get the same seed-robustness check). Same router checkpoints and E_grn seed variants
+# as row 9's A2-NullCS sweep; only the cs slot differs (real adapter instead of null).
+
+variant: row8_seed13
+language_mode: grn_Latn
+description: "Row 8 (full J-MoLE, real CS expert) multi-seed run (seed=13), symmetric with A2-NullCS seed sweep: E_cs=B2_cs_r32_grn (fixed), E_spa=B2_spa_d010 (fixed), E_grn=B3_grn_cv_cegpa_seed13. Router=router_seeds/seed_13/router_best.pt (same router checkpoints as the NullCS seed sweep -- router training does not depend on which adapter occupies the cs slot at inference)."
+
+model:
+  card: omniASR_LLM_7B_v2
+
+target_modules:
+  - q_proj
+  - v_proj
+
+lora_dropout: 0.0
+
+experts:
+  spa:
+    adapter_path: /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_spa_d010/lora_adapters.pt
+    lora_config:  /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_spa_d010/lora_config.json
+    note: "E_spa = B2_spa_d010 — fixed, same as production A2-NullCS."
+  cs:
+    adapter_path: /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_cs_r32_grn/lora_adapters.pt
+    lora_config:  /N/project/icassp2026/Jopara_ASR_models_js2/best_adapters/B2_cs_r32_grn/lora_config.json
+    note: "E_cs = B2_cs_r32_grn (real CS adapter) — fixed, same as production row 8 (jmole_grn)."
+  grn:
+    adapter_path: /N/scratch/wencshi/icassp2026_lora/v3_lora_runs/lora_runs/B3_grn_cv_cegpa_seed13/lora_adapters.pt
+    lora_config:  /N/scratch/wencshi/icassp2026_lora/v3_lora_runs/lora_runs/B3_grn_cv_cegpa_seed13/lora_config.json
+    note: "E_grn = B3_grn_cv_cegpa retrained with seed=13 (rebuttal multi-seed variance)."
+
+router:
+  d_enc: 4096
+  hidden: 512
+  pooling: mean
+  dropout: 0.1
+
+device: cuda
+dtype: bfloat16

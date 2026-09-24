@@ -1,0 +1,105 @@
+project: jopara_moe_lora
+base_model: omniASR_LLM_7B_v2
+tokenizer: omniASR_tokenizer_written_v2
+reference_column: final_corrected_reference_norm
+audio_root: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/audio_segments_full_16k
+adapters_root: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters
+
+# ── Adapter selection rationale ─────────────────────────────────────────────
+# Guaraní expert:  B3_grn_cv_cegpa (82.65% WER reduction on CEGPA, only adapter
+#                   that beats zero-shot on naturalistic CEGPA Guaraní)
+# Spanish expert:  B2_spa_d010 (22.84% WER, best Spanish result)
+# CS-Jopara expert: B2_cs_r32_grn (50.67% WER on CS grn_Latn, best code-switching)
+# Base branches kept as reference/fallback (no adapter loaded)
+
+branches:
+
+  Z0_base_grn:
+    kind: base
+    language_mode: grn_Latn
+    adapter_path: null
+    description: >
+      Zero-shot base model, generic Guaraní mode.
+      Best zero-shot for Guaraní-heavy and mixed v2 subsets.
+      grn_Latn avoids catastrophic Spanish insertions on Guaraní audio.
+
+  Z2_base_spa:
+    kind: base
+    language_mode: spa_Latn
+    adapter_path: null
+    description: >
+      Zero-shot base model, Spanish mode.
+      Strong Spanish-only baseline (26.57% WER zero-shot) but catastrophic on Guaraní-only.
+
+  E0_spa_lora:
+    kind: lora
+    language_mode: spa_Latn
+    adapter_path: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_spa_d010/lora_adapters.pt
+    lora_config: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_spa_d010/lora_config.json
+    target_modules: [q_proj, v_proj]
+    rank: 16
+    alpha: 32
+    train_source: CEGPA_spanish_only_1083_utt
+    best_metric: "22.84% dev WER (Spanish-only CV)"
+    description: >
+      PRIMARY Spanish expert. Fine-tuned on 1,083 CEGPA Spanish-only utterances.
+      Use for spanish_only and Spanish-dominant mixed utterances.
+
+  E1_grn_lora_cegpa:
+    kind: lora
+    language_mode: grn_Latn
+    adapter_path: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B3_grn_cv_cegpa/lora_adapters.pt
+    lora_config: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B3_grn_cv_cegpa/lora_config.json
+    target_modules: [q_proj, v_proj]
+    rank: 16
+    alpha: 32
+    train_source: CommonVoice_Guarani_plus_CEGPA_guarani_only
+    best_metric: "82.65% WER reduction on CEGPA naturalistic Guaraní (better than zero-shot 83.34%)"
+    description: >
+      PRIMARY Guaraní expert. Trained on CommonVoice Guaraní + CEGPA Guaraní-only utterances.
+      Only adapter that beats zero-shot on naturalistic CEGPA Guaraní.
+      Route guarani_only utterances here preferentially over B2_grn_d005 (CV-only).
+
+  E2_cs_grn_lora:
+    kind: lora
+    language_mode: grn_Latn
+    adapter_path: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_cs_r32_grn/lora_adapters.pt
+    lora_config: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_cs_r32_grn/lora_config.json
+    target_modules: [q_proj, v_proj]
+    rank: 32
+    alpha: 64
+    train_source: CEGPA_mixed_plus_jehea_871_utt
+    best_metric: "50.67% WER on CS grn_Latn test"
+    description: >
+      PRIMARY CS-Jopara expert (grn_Latn mode). Fine-tuned on 871 CEGPA mixed+jehe'a utterances.
+      Best code-switching adapter; strong for mixed, jehe'a, and Guaraní-dominant utterances.
+      Used as the MoE CS-Jopara branch. Also used as Guaraní-dominant mixed fallback.
+
+  E3_cs_spa_lora:
+    kind: lora
+    language_mode: spa_Latn
+    adapter_path: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_cs_r32_spa/lora_adapters.pt
+    lora_config: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B2_cs_r32_spa/lora_config.json
+    target_modules: [q_proj, v_proj]
+    rank: 32
+    alpha: 64
+    train_source: CEGPA_mixed_plus_jehea_871_utt
+    best_metric: "52.02% WER on CS spa_Latn test"
+    description: >
+      CS-Jopara expert (spa_Latn mode). Same training data as E2_cs_grn_lora.
+      Test for Spanish-dominant mixed utterances. Compare with E2 to decide per-utterance mode.
+
+  E5_grn_csinit_lora:
+    kind: lora
+    language_mode: grn_Latn
+    adapter_path: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B3_grn_csinit_cv_cegpa/lora_adapters.pt
+    lora_config: /media/volume/sapc2_data/victor/icassp2026/Jopara_ASR_models/best_adapters/B3_grn_csinit_cv_cegpa/lora_config.json
+    target_modules: [q_proj, v_proj]
+    rank: 32
+    alpha: 64
+    train_source: CommonVoice_Guarani_plus_CEGPA_guarani_only_cs_warmstart
+    best_metric: "63.14% WER on CV Guaraní dev (best scripted CV); 84.97% WER on CEGPA"
+    description: >
+      Secondary Guaraní expert. CS warm-started (from B2_cs_r32_grn step 2000), then fine-tuned
+      on CV+CEGPA Guaraní. Best scripted CV dev (63.14%) but not best CEGPA (84.97% vs E1's 82.65%).
+      Diagnostic branch; compare with E1 to understand scripted vs naturalistic routing.

@@ -1,0 +1,43 @@
+# B2_spa_d010 — Spanish-only ablation: dropout 0.05 → 0.10.
+# Base: a0_baseline (r=16, α=32, dropout=0.05, lr=1e-4, max_steps=4000, warmup=10%)
+# Single change: lora_dropout 0.05 → 0.10
+# Motivation: B1_spa converges at step 800 (only 20% through 4000-step training).
+# Strong early convergence typically means the model finds a local optimum quickly but
+# may not be exploring the loss landscape beyond the easy examples. Higher dropout
+# acts as a regulariser during early steps, slowing convergence and potentially
+# pushing the model past the step-800 plateau to a lower WER.
+experiment_id: B2_spa_d010
+description: "Spanish-only LoRA B2 ablation — dropout: 0.05 → 0.10; all other params = a0_baseline"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.10               # ← changed from 0.05
+  bias: "none"
+  target_modules: ["q_proj", "v_proj"]
+
+training:
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8   # EBS = 32
+  max_steps: 4000
+  eval_every: 200
+  early_stop_patience: 6
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1.0e-8
+  warmup_ratio: 0.10
+  scheduler: "cosine"
+  bf16: true
+  gradient_checkpointing: true
+  torch_compile: false
+
+checkpoint:
+  save_every: 200
+  keep_best: true
+  keep_last: true
+  keep_recent: 2
+
+best_model:
+  primary_metric: "wer_overall"
+  tiebreaker: ["wer_mixed", "cer_morph_mixed"]

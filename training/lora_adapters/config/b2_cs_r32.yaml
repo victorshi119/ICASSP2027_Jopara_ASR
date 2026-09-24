@@ -1,0 +1,44 @@
+# B2_cs_r32 — CS-Jopara ablation: r=16 → r=32, α=32 → α=64.
+# Base: b1_cs_jopara (r=16, α=32, dropout=0.10, lr=1e-4, max_steps=4000, warmup=10%, patience=8)
+# Single change: r 16 → 32, lora_alpha 32 → 64 (maintains alpha/r = 2 scaling)
+# Motivation: Code-switching requires the decoder to simultaneously handle two
+# morphological systems (Guaraní agglutination + Spanish inflection). r=16 may not
+# provide enough subspace capacity to represent both language sub-distributions
+# simultaneously. r=32 doubles the representational budget while preserving the
+# alpha/r=2 scaling so that the effective gradient contribution per-parameter is
+# unchanged relative to r=16.
+experiment_id: B2_cs_r32
+description: "CS-Jopara LoRA B2 ablation — r: 16→32, alpha: 32→64; all other params = b1_cs_jopara"
+
+lora:
+  r: 32                            # ← changed from 16
+  lora_alpha: 64                   # ← changed from 32 (maintains alpha/r = 2)
+  lora_dropout: 0.10
+  bias: "none"
+  target_modules: ["q_proj", "v_proj"]
+
+training:
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8   # EBS = 32
+  max_steps: 4000
+  eval_every: 200
+  early_stop_patience: 8
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1.0e-8
+  warmup_ratio: 0.10
+  scheduler: "cosine"
+  bf16: true
+  gradient_checkpointing: true
+  torch_compile: false
+
+checkpoint:
+  save_every: 200
+  keep_best: true
+  keep_last: true
+  keep_recent: 2
+
+best_model:
+  primary_metric: "wer_overall"
+  tiebreaker: ["wer_mixed", "cer_morph_mixed"]

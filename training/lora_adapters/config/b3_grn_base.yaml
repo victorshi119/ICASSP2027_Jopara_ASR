@@ -1,0 +1,44 @@
+# B3_grn_base — Guaraní domain-adaptation ablations base config.
+# All B3 grn_Latn runs (Groups A, B, C, D) use this unless a single parameter is varied.
+# Base hyperparams match B1_grn_v2 exactly (lr=2e-5, r=16, dropout=0.10) to isolate
+# data/init/dev-set effects. Max_steps extended to 4000 (from 2000) so naturalistic data
+# runs get same budget as CS runs; early stopping (patience=8) terminates when converged.
+#
+# B1_grn_v2 reference: r=16, lr=2e-5, dropout=0.10, 2000 steps, CEGPA=86.81%, CVdev=51.20%
+# B3 hypothesis: CEGPA naturalistic training data (train_cs_jopara.csv, 871 rows) bridges
+# the domain gap that CV-scripted (2569 rows) cannot.
+experiment_id: B3_grn_base
+description: "B3 Guaraní domain-ablation base — r=16, lr=2e-5, grn_Latn; data varies per run"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.10
+  bias: "none"
+  target_modules: ["q_proj", "v_proj"]
+
+training:
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8   # EBS = 32
+  max_steps: 4000
+  eval_every: 200
+  early_stop_patience: 8
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1.0e-8
+  warmup_ratio: 0.10
+  scheduler: "cosine"
+  bf16: true
+  gradient_checkpointing: true
+  torch_compile: false
+
+checkpoint:
+  save_every: 200
+  keep_best: true
+  keep_last: true
+  keep_recent: 2
+
+best_model:
+  primary_metric: "wer_overall"
+  tiebreaker: ["wer_mixed", "cer_morph_mixed"]

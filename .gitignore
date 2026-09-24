@@ -1,0 +1,16 @@
+# Never commit data, transcripts, model outputs or weights (see data/README.md)
+*.wav
+*.flac
+*.mp3
+*.pt
+*.safetensors
+*.npy
+*.jsonl
+*_eval.csv
+manifests/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+logs/
