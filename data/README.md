@@ -6,7 +6,7 @@ This directory holds **metadata only**: no audio and no transcript text.
 
 - **CEGPA**, the *Corpus del Español y Guaraní Paraguayos de Asunción* (Bittar et al., 2022),
   is held by the California Language Archive, UC Berkeley: doi:10.7297/X2CC0ZW0. We use the
-  seven interviews with Jopara speech, sessions `tr-005` to `tr-011`.
+  seven interviews with Jopara speech.
 - **Common Voice Guaraní** (scripted speech, release 24.0), from https://commonvoice.mozilla.org.
   It supplies the Guaraní adapter's read-aloud training clips and the Guaraní-only
   development set.
