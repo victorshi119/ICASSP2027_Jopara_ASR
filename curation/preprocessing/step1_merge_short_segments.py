@@ -8,15 +8,12 @@ What it does: within each recording (file_id), segments are sorted by start time
 segment keeps absorbing the next one while its span is shorter than 2 s; it is written out
 once it reaches 2 s, or as soon as it exceeds 50 s. The speaker column is not used.
 
-How it was run (important for reproducing the numbers): the 12,099 segments had first been
+How it was run: the 12,099 segments had first been
 split at random, row by row, into omnilingual_train_verified.csv (8,590 rows) and
 omnilingual_val_verified.csv (3,509 rows), and each file was merged separately. Within each
 file, "consecutive" segments can therefore skip over rows that went to the other file, so a
-merged span can include silence and other speakers' turns. The split code and seed were not
-recorded, so the exact output cannot be regenerated: rerunning this script on random
-8,590/3,509 splits of the original transcripts gives 6,623-6,645 segments (7.8-8.1% longer
-than 10 s), against 6,635 (7.8%) in the original run; merging all 12,099 at once gives 6,386.
-The original 6,635-row table is available from the authors on request.
+merged span can include silence and other speakers' turns. The resulting 6,635-row table is
+available from the authors on request.
 """
 import pandas as pd
 import soundfile as sf

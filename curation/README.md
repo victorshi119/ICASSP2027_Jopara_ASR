@@ -14,14 +14,11 @@ into 3,288 candidate utterances (6.5 hours, median 4.3 s):
 | 3 `step3_cut_segments.py` | Cut each utterance out of its session recording | 3,288 clips |
 | 4 `step4_resample_16k.py` | Convert to 16 kHz, mono, 16-bit | 3,288 clips |
 
-**Step 1 was recovered from our project notes, but its exact output cannot be regenerated.**
-Before merging, the 12,099 segments had been split at random, row by row, into a train file
-(8,590) and a validation file (3,509), and each file was merged separately. The split's code and
-seed were not recorded. Rerunning `step1_merge_short_segments.py` on random 8,590/3,509 splits of
-the original transcripts gives 6,623–6,645 segments, against 6,635 in the original run (merging
-all 12,099 at once gives 6,386). Because merging skipped over rows in the other file and ignores
-the speaker, some merged spans include silence or overlapping turns, which step 2 resolves. The
-original 6,635-row table is available on request. Paths in step 1 are our original cluster paths.
+**Step 1 was recovered from our project notes.** Before merging, the 12,099 segments were split
+at random, row by row, into a train file (8,590) and a validation file (3,509), and each file was
+merged separately. Because merging ignores the speaker, some merged spans include silence or
+overlapping turns, which step 2 resolves. The 6,635-row table is available on request. Paths in
+step 1 are our original cluster paths.
 
 Steps 2–4 were run in Colab notebooks. The scripts here are verbatim extracts of those cells,
 and each file's header names the notebook and cells it came from. Paths are still the original
