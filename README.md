@@ -30,11 +30,12 @@ Character error rate / word error rate (%) on the 150-utterance test set (full t
 | Best LoRA adapter applied to everything | 29.1 / 53.8 |
 | Mixture of experts, code-switching slot empty (3 seeds) | **24.3±0.1 / 46.1±0.2** |
 
-Without a specified language, current multilingual ASR still makes 28.4% character errors.
-Telling it which language to expect is the most effective fix (25.0% CER), and our best system, a
-mixture-of-experts router over fine-tuned adapters, reaches 24.3% CER. Under this data scarcity,
-however, a dedicated code-switching adapter shows no measurable benefit, and routing does not
-significantly beat naming the language.
+Without a specified language, current multilingual ASR makes 28.4% character errors. Our
+best-performing configuration, a mixture-of-experts router with the code-switching adapter replaced
+by an empty slot, achieves the lowest error among the 11 systems tested (24.3% CER, 46.1% WER). It
+does not significantly outperform applying the fixed Guaraní mode to every utterance (25.0% CER),
+showing that language-mode choice, not adapter training, drives the improvement. The dedicated
+code-switching adapter yields no measurable benefit, and the full router is unstable across seeds.
 
 ## What is and is not in this repository
 
