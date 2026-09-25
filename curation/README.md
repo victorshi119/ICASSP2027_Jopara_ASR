@@ -9,13 +9,20 @@ into 3,288 candidate utterances (6.5 hours, median 4.3 s):
 
 | Step | What it does | Result |
 |---|---|---|
-| 1 | Merge segments shorter than 2 s with their neighbours in the same session (target 2–50 s) | 12,099 → 6,635 |
+| 1 `step1_merge_short_segments.py` | Merge segments shorter than 2 s with the following ones in the same session (target 2–50 s) | 12,099 → 6,635 |
 | 2 `step2_merge_overlapping_segments.py` | Merge segments whose time spans overlap | 6,635 → 3,288 |
 | 3 `step3_cut_segments.py` | Cut each utterance out of its session recording | 3,288 clips |
 | 4 `step4_resample_16k.py` | Convert to 16 kHz, mono, 16-bit | 3,288 clips |
 
-**The code for step 1 was not kept.** It ran on a cluster directory that no longer exists, so
-only its output, a 6,635-row segment table, survives. We can share that table on request.
+**Step 1 was recovered from our project notes, but its exact output cannot be regenerated.**
+Before merging, the 12,099 segments had been split at random, row by row, into a train file
+(8,590) and a validation file (3,509), and each file was merged separately. The split's code and
+seed were not recorded. Rerunning `step1_merge_short_segments.py` on random 8,590/3,509 splits of
+the original transcripts gives 6,623–6,645 segments, against 6,635 in the original run (merging
+all 12,099 at once gives 6,386). Because merging skipped over rows in the other file and ignores
+the speaker, some merged spans include silence or overlapping turns, which step 2 resolves. The
+original 6,635-row table is available on request. Paths in step 1 are our original cluster paths.
+
 Steps 2–4 were run in Colab notebooks. The scripts here are verbatim extracts of those cells,
 and each file's header names the notebook and cells it came from. Paths are still the original
 Colab paths.
